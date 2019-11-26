@@ -29,6 +29,7 @@ def main(args):
         faces='https://drive.google.com/uc?id=1MEGjdvVpUsu1jB4zrXZN7Y4kBBOzizDQ',
         cats='https://drive.google.com/uc?id=1MQywl0FNt6lHu8E_EUqnRbviagS7fbiJ',
         bedrooms='https://drive.google.com/uc?id=1MOSKeGF0FJcivpBI7s63V9YHloUTORiF',
+        celeba='https://drive.google.com/uc?id=1MGqJl28pN4t7SAtSrPdSRJSQJqahkzUf',
     )
     url = dataset_urls[args.dataset]
 
@@ -106,7 +107,7 @@ if __name__ == "__main__":
     parser.add_argument('--truncation', type=float, default=1.)
     parser.add_argument('--scaling', default='normalize')
     parser.add_argument('--batch-size', type=int, default=8)
-    parser.add_argument('--output-size', type=int, default=256)
+    parser.add_argument('--output-size', type=int, default=None)
     parser.add_argument('--wids', default=None, type=int, nargs='+',
                             help='Render only these watchables by id.')
     args = parser.parse_args()
