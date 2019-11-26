@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 import PIL.Image
 from sklearn import preprocessing
+import tqdm
 import dnnlib
 import dnnlib.tflib as tflib
 import config
@@ -26,7 +27,8 @@ def main(args):
     # Load pre-trained network.
     dataset_urls = dict(
         faces='https://drive.google.com/uc?id=1MEGjdvVpUsu1jB4zrXZN7Y4kBBOzizDQ',
-        cats='https://drive.google.com/uc?id=1MQywl0FNt6lHu8E_EUqnRbviagS7fbiJ'
+        cats='https://drive.google.com/uc?id=1MQywl0FNt6lHu8E_EUqnRbviagS7fbiJ',
+        bedrooms='https://drive.google.com/uc?id=1MOSKeGF0FJcivpBI7s63V9YHloUTORiF',
     )
     url = dataset_urls[args.dataset]
 
@@ -47,12 +49,13 @@ def main(args):
 
     os.makedirs(config.result_dir, exist_ok=True)
 
-    for row_id, row in features_df.iterrows():
-        wid = row['watchable_id']
-        print('rendering', wid)
-        features = row['features'].astype(np.float32)[None, :]
-
-        # Pick latent vector.
+    num_batches = int(np.ceil(len(features_df) / args.batch_size))
+    for batch_i in tqdm.tqdm(list(range(num_batches))):
+        batch_offset = batch_i * args.batch_size
+        batch_end = min(batch_offset + args.batch_size, len(features_df))
+        indexes = range(batch_offset, batch_end)
+        rows = features_df.iloc[indexes]
+        features = np.vstack(rows['features'].to_numpy()).astype(np.float32)
         z_dims = Gs.input_shape[1]
         num_features, feature_dims = features.shape
         # Tile our feature vector until it has the required dimensionality
@@ -65,10 +68,15 @@ def main(args):
             z_features, None, truncation_psi=0.7, randomize_noise=True,
             output_transform=fmt
         )
-
-        # Save image.
-        png_filename = os.path.join(config.result_dir, f'{wid}.png')
-        PIL.Image.fromarray(images[0], 'RGB').save(png_filename)
+        for wid, image in zip(rows['watchable_id'], images):
+            png_filename = os.path.join(config.result_dir, f'{wid}.png')
+            img = PIL.Image.fromarray(image, 'RGB')
+            if args.output_size:
+                img = img.resize(
+                    (args.output_size, args.output_size),
+                    PIL.Image.ANTIALIAS
+                )
+            img.save(png_filename)
 
 
 def load_features(args):
@@ -87,6 +95,7 @@ def load_features(args):
                 lambda x: x.clip(-args.truncation, args.truncation)
             )
         features['features'] = list(scaler.transform(features_arr))
+    features.reset_index(inplace=True, drop=True)
     return features
 
 
@@ -96,6 +105,8 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', default='cats')
     parser.add_argument('--truncation', type=float, default=1.)
     parser.add_argument('--scaling', default='normalize')
+    parser.add_argument('--batch-size', type=int, default=8)
+    parser.add_argument('--output-size', type=int, default=256)
     parser.add_argument('--wids', default=None, type=int, nargs='+',
                             help='Render only these watchables by id.')
     args = parser.parse_args()
